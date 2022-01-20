@@ -1,0 +1,60 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.7;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract BettingLucasContract is Ownable {
+    
+    uint private bettingPrice = 0.1 ether;
+    uint private roundNumber = 1;
+    uint private currentRound = 0;
+
+    struct Round {
+        mapping (address => uint) bets;
+        mapping (uint => address[]) numberToAddress;
+    }
+
+    Round[] private rounds;
+
+    function startNewRound() external onlyOwner {
+        require(rounds.length < roundNumber);
+        rounds.push();
+    }
+
+    function rndNumber() private view returns (uint) {
+        uint number = uint(keccak256(abi.encodePacked(roundNumber, currentRound)));
+        return number % 1000 + 1;
+    }
+
+    function placeBet(uint betNumber) external payable {
+        require(betNumber > 0 && betNumber <= 1000);
+        require(msg.value == bettingPrice);
+        Round storage round = rounds[currentRound];
+        require(round.bets[msg.sender] == 0);
+        round.bets[msg.sender] = betNumber;
+        round.numberToAddress[betNumber].push(msg.sender);
+    }
+
+    function finishRound() external onlyOwner {
+        Round storage round = rounds[currentRound];
+        uint winningNumber = rndNumber();
+        address[] memory winners = round.numberToAddress[winningNumber];
+        if (winners.length != 0) {
+            uint pricePerWinner = address(this).balance / winners.length;
+            for (uint i=0; i < winners.length; i++) {
+                payable(winners[i]).transfer(pricePerWinner);
+            }
+        }
+        roundNumber = roundNumber + 1;
+        currentRound = currentRound + 1;
+    }
+
+    function changeBettingPrice(uint price) external onlyOwner {
+        bettingPrice = price / 1 ether;
+    }
+
+    function getRoundsPlayed() public view returns (uint) {
+        return roundNumber;
+    }
+
+}
